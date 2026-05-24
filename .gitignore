@@ -589,3 +589,5 @@ healthchecksdb
 
 builddir-release
 migrate.nu
+!scripts/*.bat
+certs

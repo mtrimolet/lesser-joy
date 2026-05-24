@@ -36,7 +36,7 @@ export namespace lj {
 
         template<typename Self, typename Func>
         constexpr auto map(this Self&& self, Func&& then) -> result<decltype(then(self.value())), E> {
-            using To = result<decltype(then(value())), E>;
+            using To = result<decltype(then(self.value())), E>;
             if (not self.has_value()) return To { forward<Self>(self).error() };
 
             if constexpr (meta::IsAnyOf<Self, result<T, E>&&, const result<T, E>&&>) {

@@ -1,0 +1,56 @@
+[Version]
+Signature = "$WINDOWS NT$"
+Class = Bluetooth
+ClassGuid = {e0cbf06c-cd8b-4647-bb8a-263b43f0f974}
+Provider = %ManufacturerName%
+DriverVer = 01/01/1970, 1.0.0.0
+; CatalogFile = lesser-joy-bluetooth-driver.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+lesser-joy-bluetooth-driver.sys = 1,,
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName% = Microsoft, NTamd64.10
+
+[Microsoft.NTamd64.10]
+%DeviceDesc% = lesser-joy-bluetooth-inst, BTHENUM\{c66f1b8d-9cc1-4e8f-ad07-383aa8982abd}
+
+[lesser-joy-bluetooth-inst.NT]
+CopyFiles = lesser-joy-bluetooth-files
+
+[lesser-joy-bluetooth-files]
+lesser-joy-bluetooth-driver.sys
+
+[lesser-joy-bluetooth-inst.NT.Services]
+AddService = lesser-joy-bluetooth-driver, %AssocService%, lesser-joy-bluetooth-service-inst
+
+[lesser-joy-bluetooth-service-inst]
+DisplayName   = %ServiceDisplayName%
+ServiceType   = 1               ; SERVICE_KERNEL_DRIVER
+StartType     = 3               ; SERVICE_DEMAND_START 
+ErrorControl  = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary = %12%\lesser-joy-bluetooth-driver.sys
+
+[lesser-joy-bluetooth-inst.NT.Wdf]
+KmdfService = lesser-joy-bluetooth-driver, lesser-joy-bluetooth-wdf
+
+[lesser-joy-bluetooth-wdf]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+ManufacturerName   = "TapzCrew"
+DiskName           = "LesserJoy Bluetooth installation disk"
+DeviceDesc         = "LesserJoy Bluetooth enumerator"
+ServiceDisplayName = "LesserJoy Bluetooth driver"
+AssocService       = 0x00000002

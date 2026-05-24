@@ -47,6 +47,9 @@ add_rules("mode.debug", "mode.release")
 add_rules("install-wdk")
 
 includes("stormkit-driver/xmake.lua")
+
 includes("driver/xmake.lua")
+includes("bluetooth-driver/xmake.lua")
+
 includes("qt-frontend/xmake.lua")
 includes("cli-frontend/xmake.lua")
