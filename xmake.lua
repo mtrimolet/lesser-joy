@@ -25,6 +25,7 @@ option("sanitizers", { default = false, category = "root menu/build" })
 option("mold", { default = false, category = "root menu/build" })
 option("lto", { default = true, category = "root menu/build" })
 
+option("bt", { description = "build bt service", default = true, category = "root menu/services" })
 option("cli", { description = "build cli frontend", default = true, category = "root menu/frontends" })
 option("gui", { description = "build gui frontend", default = true, category = "root menu/frontends" })
 
@@ -101,5 +102,6 @@ add_requires(stormkit_dep_name, {
 
 -- includes("stormkit-driver/xmake.lua")
 includes("driver/xmake.lua")
+if get_config("bt") then includes("bt-svc/xmake.lua") end
 if get_config("gui") then includes("qt-frontend/xmake.lua") end
 if get_config("cli") then includes("cli-frontend/xmake.lua") end
