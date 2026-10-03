@@ -7,8 +7,9 @@ package("simpleble", function()
     add_urls("https://github.com/simpleble/simpleble/archive/refs/tags/$(version).tar.gz",
              "https://github.com/simpleble/simpleble.git")
 
-    add_versions("v0.14.0", "59db8ff215c917669e2678a6353319eae32ffe35c85b1e9ca7912bdee1d6167b")
+    add_versions("v1.2.0", "da9cc41e2236639d8faab630ff8dc28152ebc6677f14bbb4782c6b2a67a13b3f")
 
+    add_syslinks("SetupAPI")
     -- if is_plat("windows", "mingw") then
     --     add_syslinks("dbghelp")
     -- elseif is_plat("linux", "cross") then
@@ -52,6 +53,8 @@ package("simpleble", function()
                     add_defines("SIMPLEBLE_BACKEND_ANDROID=0")
                     add_defines("SIMPLEBLE_BACKEND_MACOS=0")
                     add_defines("SIMPLEBLE_BACKEND_IOS=0")
+
+                    add_syslinks("SetupAPI")
                     
                     add_headerfiles("simpleble/include/(**.h)", "dependencies/external/(**.h)")
                     add_includedirs(
