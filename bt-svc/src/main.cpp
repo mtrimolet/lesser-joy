@@ -476,6 +476,25 @@ struct BLEController {
     }
 };
 
+struct Joystick {
+    std::uint16_t x, y;
+
+    static auto fromBytes(const auto& bytes, std::size_t i) -> Joystick {
+        return Joystick{
+            .x = static_cast<uint16_t>(((bytes[i + 0] & 0xFF) >> 0) | ((bytes[i + 1] & 0x0F) << 8)),
+            .y = static_cast<uint16_t>(((bytes[i + 1] & 0xF0) >> 4) | ((bytes[i + 2] & 0xFF) << 4)),
+        };
+    }
+
+    auto toBytes() -> std::array<uint8_t, 3> {
+        return std::array<uint8_t, 3>{
+            static_cast<uint8_t>( (x >> 0) & 0xFF),
+            static_cast<uint8_t>(((x >> 8) & 0x0F) | ((y << 4) & 0xF0)),
+            static_cast<uint8_t>( (y >> 4) & 0xFF),
+        };
+    }
+};
+
 auto animate() -> void {
     for (;;) {
         std::this_thread::sleep_for(1s);
@@ -495,9 +514,49 @@ auto run_app() -> std::expected<void, BLEException> {
     std::println("Initialized.");
 
     // show(controller);
+    struct Bound {
+        Joystick min, max;
 
-    Try(controller.subscribe_input([](auto bytes) {
-        if (not stdr::empty(bytes) and bytes[0] % 020 != 0) {
+        void refresh(const Joystick& in) {
+            min.x = std::min(min.x, in.x);
+            max.x = std::max(max.x, in.x);
+            min.y = std::min(min.y, in.y);
+            max.y = std::max(max.y, in.y);
+        }
+
+        static auto scale(uint16_t value, uint16_t from_min, uint16_t from_max, uint16_t to_min, uint16_t to_max) -> uint16_t {
+            const auto from_r = from_max - from_min;
+            const auto to_r = to_max - to_min;
+            return (((value - from_min) * to_r) / from_r) + to_min;
+        }
+
+        void scale(Joystick& j) {
+            j.x = scale(j.x, min.x, max.x, 0, 0xFFF);
+            j.y = scale(j.y, min.y, max.y, 0, 0xFFF);
+        }
+    };
+
+    auto left_bound = Bound {
+        .min = { .x = 1000, .y = 1000 },
+        .max = { .x = 3000, .y = 3000 },
+    };
+    auto right_bound = Bound {
+        .min = { .x = 1000, .y = 1000 },
+        .max = { .x = 3000, .y = 3000 },
+    };
+
+    Try(controller.subscribe_input([&left_bound, &right_bound](auto bytes) {
+        auto leftStick = Joystick::fromBytes(bytes, 0x05);
+        left_bound.refresh(leftStick);
+        auto leftOld = leftStick;
+        left_bound.scale(leftStick);
+
+        auto rightStick = Joystick::fromBytes(bytes, 0x08);
+        right_bound.refresh(rightStick);
+        auto rightOld = rightStick;
+        right_bound.scale(rightStick);
+
+        if (not stdr::empty(bytes) and bytes[0] % 0x10 != 0) {
             return;
         }
 
@@ -507,26 +566,21 @@ auto run_app() -> std::expected<void, BLEException> {
         std::println("Power Info: {:d}", bytes[0x1]);
 
         std::println("Buttons: {:08b} {:08b} {:08b}", bytes[0x2], bytes[0x3], bytes[0x4]);
-        
-        const auto li = 0x05;
-        const auto lx = (static_cast<uint16_t>(bytes[li + 0] & 0xFF) << 4) + (static_cast<uint16_t>(bytes[li + 1] & 0xF0) >> 4);
-        const auto ly = (static_cast<uint16_t>(bytes[li + 1] & 0x0F) << 8) +  static_cast<uint16_t>(bytes[li + 2] & 0xFF);
-        // const auto lx = static_cast<uint16_t>(bytes[li + 0] & 0xFF) + (static_cast<uint16_t>(bytes[li + 1] & 0xF0) << 4);
-        // const auto ly = static_cast<uint16_t>(bytes[li + 1] & 0x0F) + (static_cast<uint16_t>(bytes[li + 2] & 0xFF) << 4);
+
         std::println("Left Analog Stick:  {:08b} {:08b} {:08b}", bytes[0x5], bytes[0x6], bytes[0x7]);
-        const auto ri = 0x08;
-        const auto rx = (static_cast<uint16_t>(bytes[ri + 0] & 0xFF) << 4) + (static_cast<uint16_t>(bytes[ri + 1] & 0xF0) >> 4);
-        const auto ry = (static_cast<uint16_t>(bytes[ri + 1] & 0x0F) << 8) +  static_cast<uint16_t>(bytes[ri + 2] & 0xFF);
-        // const auto rx = static_cast<uint16_t>(bytes[ri + 0] & 0xFF) + (static_cast<uint16_t>(bytes[ri + 1] & 0xF0) << 4);
-        // const auto ry = static_cast<uint16_t>(bytes[ri + 1] & 0x0F) + (static_cast<uint16_t>(bytes[ri + 2] & 0xFF) << 4);
+        std::println("              Raw   x = {:d} y = {:d}", leftOld.x,  leftOld.y);
+        std::println("           Scaled   x = {:d} y = {:d}", leftStick.x,  leftStick.y);
+
         std::println("Right Analog Stick: {:08b} {:08b} {:08b}", bytes[0x8], bytes[0x9], bytes[0xA]);
+        std::println("              Raw   x = {:d} y = {:d}", rightOld.x,  rightOld.y);
+        std::println("           Scaled   x = {:d} y = {:d}", rightStick.x,  rightStick.y);
 
         std::println("Unknown: {:08b}"            , bytes[0xB]);
         std::println("NFC state: {:08b}"          , bytes[0xC]);
         std::println("Headset Audio State: {:08b}", bytes[0xD]);
-        std::println("Motion Data Length: {:d}"  , bytes[0xE]);
-        // std::println("Motion Data: {:0b}"       , bytes[0xF],  ...);
-        // std::println("Reserved: {}"             , bytes[0x0]);
+        std::println("Motion Data Length: {:d}"   , bytes[0xE]);
+        // std::println("Motion Data: {:0b}"        , bytes[0xF],  ...);
+        // std::println("Reserved: {}"              , bytes[0x0]);
     }, 0xffff));
     std::println("Subscribed.");
 
