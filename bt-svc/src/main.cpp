@@ -169,7 +169,7 @@ struct BLEAdapter {
 struct BLEController {
     SimpleBLE::Safe::Peripheral peripheral;
 
-    auto print() -> void {
+    auto print(bool with_manufacturer_data = false, bool with_services = false) -> void {
         std::println("[{}] {} (type: {})",
                      peripheral.identifier().value_or("unknown"),
                      peripheral.address().value_or("unknown"),
@@ -184,62 +184,70 @@ struct BLEController {
                      peripheral.is_paired().value_or(false),
                      peripheral.is_connected().value_or(false));
 
-        if (auto manufacturer_data = peripheral.manufacturer_data(); manufacturer_data and not manufacturer_data->empty())
-            for (auto& [manufacturer_id, data] : *manufacturer_data) {
-                std::println("    Manufacturer ID: {}", manufacturer_id);
-                std::println("    Manufacturer data: {}", data);
-            }
-        else
-            std::println("    No manufacturer data");
+        if (with_manufacturer_data) {
+            auto manufacturer_data = peripheral.manufacturer_data();
+            if (not manufacturer_data or manufacturer_data->empty())
+                std::println("    No manufacturer data");
+            else
+                for (auto& [manufacturer_id, data] : *manufacturer_data) {
+                    std::println("    Manufacturer ID: {:04X}", manufacturer_id);
+                    std::println("    Manufacturer data: {:n:02X}", data);
+                }
+        }
 
         // std::println("(S): Service, (C): Characteristic, (D): Descriptor");
 
-        if (auto services = peripheral.services(); services and not services->empty())
-            for (auto& service : *services) {
-                if (auto name = service_name(service.uuid()); name) {
-                    std::println("    {}", *name);
-                } else {
-                    std::println("    (S) {}", service.uuid());
-                }
-
-                std::println("        -> {}", service.data());
-                for (auto& characteristic : service.characteristics()) {
-                    if (auto name = characteristic_name(characteristic.uuid()); name) {
-                        std::println("        {} {}", *name, characteristic.capabilities());
-                    }
-                    else {
-                        std::println("        (C) {} {}", characteristic.uuid(), characteristic.capabilities());
+        if (with_services) {
+            auto services = peripheral.services();
+            if (not services or services->empty()) {
+                std::println("    No service available");
+            }
+            else {
+                for (auto& service : *services) {
+                    if (auto name = service_name(service.uuid()); name) {
+                        std::println("    {}", *name);
+                    } else {
+                        std::println("    (S) {}", service.uuid());
                     }
 
-                    if (characteristic.can_read()) {
-                        if (auto data = peripheral.read(service.uuid(), characteristic.uuid()); data) {
-                            if (characteristic.uuid() == SimpleBLE::BluetoothUUID { "00002a00-0000-1000-8000-00805f9b34fb" }) {
-                                std::println("            -> {}", *data | stdr::to<std::string>());
-                            }
-                            else {
-                                std::println("            -> {}", *data);
-                            }
-                        }
-                    }
-
-                    for (auto& descriptor : characteristic.descriptors()) {
-                        if (auto name = descriptor_name(descriptor.uuid()); name) {
-                            std::println("            {}", *name);
+                    std::println("        -> {}", service.data());
+                    for (auto& characteristic : service.characteristics()) {
+                        if (auto name = characteristic_name(characteristic.uuid()); name) {
+                            std::println("        {} {}", *name, characteristic.capabilities());
                         }
                         else {
-                            std::println("            (D) {}", descriptor.uuid());
+                            std::println("        (C) {} {}", characteristic.uuid(), characteristic.capabilities());
                         }
 
                         if (characteristic.can_read()) {
-                            if (auto data = peripheral.read(service.uuid(), characteristic.uuid(), descriptor.uuid()); data) {
-                                std::println("                -> {}", *data);
+                            if (auto data = peripheral.read(service.uuid(), characteristic.uuid()); data) {
+                                if (characteristic.uuid() == SimpleBLE::BluetoothUUID { "00002a00-0000-1000-8000-00805f9b34fb" }) {
+                                    std::println("            -> {}", *data | stdr::to<std::string>());
+                                }
+                                else {
+                                    std::println("            -> {}", *data);
+                                }
+                            }
+                        }
+
+                        for (auto& descriptor : characteristic.descriptors()) {
+                            if (auto name = descriptor_name(descriptor.uuid()); name) {
+                                std::println("            {}", *name);
+                            }
+                            else {
+                                std::println("            (D) {}", descriptor.uuid());
+                            }
+
+                            if (characteristic.can_read()) {
+                                if (auto data = peripheral.read(service.uuid(), characteristic.uuid(), descriptor.uuid()); data) {
+                                    std::println("                -> {}", *data);
+                                }
                             }
                         }
                     }
                 }
             }
-        else
-            std::println("    No service available");
+        }
     }
 
     auto connect() -> std::expected<void, BLEException> {
@@ -510,10 +518,11 @@ auto run_app() -> std::expected<void, BLEException> {
         controller.disconnect();
     }};
 
+    controller.print(true);
+
     Try(controller.initialize(adapter));
     std::println("Initialized.");
 
-    // show(controller);
     struct Bound {
         Joystick min, max;
 
